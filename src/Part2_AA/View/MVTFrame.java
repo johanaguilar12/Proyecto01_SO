@@ -1,8 +1,8 @@
 package Part2_AA.View;
 
-import Simulation.Mem;
-import Simulation.Partition;
-import Simulation.Process;
+import Part2_AA.Simulacion;
+import Part2_AA.Particion;
+import Part2_AA.Proceso;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -10,6 +10,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MVTFrame extends JFrame {
@@ -17,9 +18,10 @@ public class MVTFrame extends JFrame {
     private JTable tbProcesos;
     private JTable tbAreasLibres;
     private JTable tbParticiones;
-    private Mem memory;
+    private Simulacion memory;
+    private JButton pasoButton; // Variable para almacenar el botón Paso
 
-    public MVTFrame(Mem memory) {
+    public MVTFrame(Simulacion memory) {
         this.memory = memory;
         setTitle("SIMULACIÓN DE ASIGNACIÓN DE MEMORIA CON MVT");
         setSize(800, 650);
@@ -43,8 +45,6 @@ public class MVTFrame extends JFrame {
         JPanel memoria = new JPanel();
         Color lightGray = new Color(245, 247, 248);
         Color blue = new Color(150, 182, 197);
-        new Color(241, 240, 232);
-        new Color(69, 71, 75);
         this.panelColors(header, blue);
         this.panelColors(footer, blue);
         this.panelColors(body, lightGray);
@@ -61,7 +61,7 @@ public class MVTFrame extends JFrame {
         memoria.setPreferredSize(new Dimension(200, 400));
         areasLibres.setPreferredSize(new Dimension(450, 150));
         particiones.setPreferredSize(new Dimension(450, 150));
-        procesos.setBorder((Border)null);
+        procesos.setBorder(null);
         JLabel titulo = new JLabel("Label");
         JLabel lbProcesos = new JLabel();
         JLabel lbAreaLibre = new JLabel();
@@ -73,31 +73,31 @@ public class MVTFrame extends JFrame {
         this.titleConfiguration(lbParticiones, "Tabla de Particiones [TP]");
         this.titleConfiguration(lbMemoria, "Memoria");
         header.setLayout(new BorderLayout());
-        header.add(titulo, "Center");
+        header.add(titulo, BorderLayout.CENTER);
         memoria.add(lbMemoria);
         this.createButton(footer);
         this.createTablaProcesos(procesos, lbProcesos);
         this.createTablaAreasLibres(areasLibres, lbAreaLibre);
         this.createTablaParticiones(particiones, lbParticiones);
-        Memory memory = new Memory();
-        memory.addProcess(10);
-        memory.addProcess(54);
-        memoria.add(memory, "Center");
-        add(header, "North");
-        add(body, "Center");
-        add(footer, "South");
-        body.add(procesos, "North");
-        body.add(tablas, "Center");
-        body.add(memoria, "East");
-        tablas.add(areasLibres, "North");
-        tablas.add(particiones, "South");
+        Memory memoryPanel = new Memory();
+        memoria.add(memoryPanel, BorderLayout.CENTER);
+        add(header, BorderLayout.NORTH);
+        add(body, BorderLayout.CENTER);
+        add(footer, BorderLayout.SOUTH);
+        body.setLayout(new BorderLayout());
+        body.add(procesos, BorderLayout.NORTH);
+        body.add(tablas, BorderLayout.CENTER);
+        body.add(memoria, BorderLayout.EAST);
+        tablas.setLayout(new BorderLayout());
+        tablas.add(areasLibres, BorderLayout.NORTH);
+        tablas.add(particiones, BorderLayout.SOUTH);
     }
 
     public void titleConfiguration(JLabel label, String text) {
         label.setText(text);
-        label.setFont(new Font("Segoe UI", 1, 12));
-        label.setHorizontalAlignment(0);
-        label.setVerticalAlignment(0);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setHorizontalAlignment(SwingConstants.CENTER);
+        label.setVerticalAlignment(SwingConstants.CENTER);
     }
 
     public void panelColors(JPanel panel, Color color) {
@@ -105,117 +105,86 @@ public class MVTFrame extends JFrame {
     }
 
     public void createButton(JPanel panel) {
-        JButton paso = new JButton();
-
-        paso.setText("Paso " + pasoCount); // Inicialmente, muestra "Paso 0"
+        JButton paso = new JButton("Paso " + pasoCount);
         paso.setBackground(new Color(241, 240, 232));
         paso.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                pasoCount++; // Incrementar el contador de pasos
-                paso.setText("Paso " + pasoCount); // Actualizar el texto del botón
-                memory.runStep(); // Avanzar un paso en la simulación
-                updateProcessTable(memory.getProcessList()); // Actualizar tabla de procesos
-                updateFreeAreasTable(memory.getPartitions()); // Actualizar tabla de áreas libres
-                updatePartitionsTable(memory.getPartitions()); // Actualizar tabla de particiones
+                pasoCount++;
+                paso.setText("Paso " + pasoCount);
+                memory.pasoN(pasoCount);
+                actualizarParticiones();
+                actualizarAreasLibres();
             }
         });
         panel.add(paso);
+        pasoButton = paso; // Almacenar el botón Paso en la variable de instancia
     }
 
     public void createTablaProcesos(JPanel procesos, JLabel lbProcesos) {
-        String[] columnNames = new String[]{"Proceso", "Tamaño", "Tiempo de llegada", "Duración (tiempo en que finaliza)"};
+        String[] columnNames = {"Proceso", "Tamaño", "Tiempo de llegada", "Duración (tiempo en que finaliza)"};
         DefaultTableModel model = new DefaultTableModel(columnNames, 6);
         tbProcesos = new JTable(model);
-        JScrollPane jScrollPaneTP = new JScrollPane();
+        JScrollPane jScrollPaneTP = new JScrollPane(tbProcesos);
         this.configuracionTablas(tbProcesos, jScrollPaneTP);
         procesos.setLayout(new BorderLayout(10, 10));
-        procesos.add(lbProcesos, "North");
-        procesos.add(jScrollPaneTP, "Center");
+        procesos.add(lbProcesos, BorderLayout.NORTH);
+        procesos.add(jScrollPaneTP, BorderLayout.CENTER);
     }
 
     public void createTablaAreasLibres(JPanel areasLibres, JLabel lbAreasLibres) {
-        String[] columnNames = new String[]{"No.", "Localidad", "Tamaño", "Estado"};
+        String[] columnNames = {"No.", "Localidad", "Tamaño", "Estado"};
         DefaultTableModel model = new DefaultTableModel(columnNames, 4);
         tbAreasLibres = new JTable(model);
-        JScrollPane jScrollPaneTAL = new JScrollPane();
+        JScrollPane jScrollPaneTAL = new JScrollPane(tbAreasLibres);
         this.configuracionTablas(tbAreasLibres, jScrollPaneTAL);
         areasLibres.setLayout(new BorderLayout(10, 10));
-        areasLibres.add(lbAreasLibres, "North");
-        areasLibres.add(jScrollPaneTAL, "Center");
+        areasLibres.add(lbAreasLibres, BorderLayout.NORTH);
+        areasLibres.add(jScrollPaneTAL, BorderLayout.CENTER);
     }
 
     public void createTablaParticiones(JPanel particiones, JLabel lbParticiones) {
-        String[] columnNames = new String[]{"No.", "Localidad", "Tamaño", "Estado", "Proceso"};
+        String[] columnNames = {"No.", "Localidad", "Tamaño", "Estado", "Proceso"};
         DefaultTableModel model = new DefaultTableModel(columnNames, 4);
         tbParticiones = new JTable(model);
-        JScrollPane jScrollPaneTP = new JScrollPane();
+        JScrollPane jScrollPaneTP = new JScrollPane(tbParticiones);
         this.configuracionTablas(tbParticiones, jScrollPaneTP);
         particiones.setLayout(new BorderLayout(10, 10));
-        particiones.add(lbParticiones, "North");
-        particiones.add(jScrollPaneTP, "Center");
+        particiones.add(lbParticiones, BorderLayout.NORTH);
+        particiones.add(jScrollPaneTP, BorderLayout.CENTER);
     }
 
     public void configuracionTablas(JTable table, JScrollPane jScrollPane) {
         Color blue = new Color(170, 215, 217);
         table.getTableHeader().setOpaque(false);
-        table.getTableHeader().setBorder((Border)null);
+        table.getTableHeader().setBorder(null);
         table.getTableHeader().setBackground(blue);
-        table.setBorder((Border)null);
+        table.setBorder(null);
         table.setGridColor(new Color(229, 225, 218));
         jScrollPane.setViewportView(table);
-        jScrollPane.getViewport().setBackground((Color)null);
-        jScrollPane.setViewportBorder((Border)null);
+        jScrollPane.getViewport().setBackground(null);
+        jScrollPane.setViewportBorder(null);
     }
 
-    // Método para actualizar la tabla de áreas libres en MVTFrame
-    public void updateFreeAreasTable(List<Partition> partitions) {
+    public void actualizarParticiones() {
+        DefaultTableModel model = (DefaultTableModel) tbParticiones.getModel();
+        model.setRowCount(0);
+        List<Particion> listaParticion = memory.getListaParticion();
+        for (int i = 0; i < listaParticion.size(); i++) {
+            Particion particion = listaParticion.get(i);
+            model.addRow(new Object[]{i + 1, particion.getLocalidad(), particion.getTam(), particion.isEstado(), particion.getProceso()});
+        }
+    }
+    public void actualizarAreasLibres() {
         DefaultTableModel model = (DefaultTableModel) tbAreasLibres.getModel();
-        model.setRowCount(0); // Limpiar la tabla antes de actualizarla
-
-        for (Partition partition : partitions) {
-            if (partition.isAvailable()) {
-                Object[] row = {partition.getLocation(), partition.getSize(), "Disponible"};
-                model.addRow(row);
+        model.setRowCount(0);
+        List<Particion> listaParticion = memory.getListaParticion();
+        for (int i = 0; i < listaParticion.size(); i++) {
+            Particion particion = listaParticion.get(i);
+            if (particion.isEstado()) {
+                model.addRow(new Object[]{i + 1, particion.getLocalidad(), particion.getTam(), particion.isEstado()});
             }
         }
     }
 
-    // Método para actualizar la tabla de particiones en MVTFrame
-    public void updatePartitionsTable(List<Partition> partitions) {
-        DefaultTableModel model = (DefaultTableModel) tbParticiones.getModel();
-        model.setRowCount(0); // Limpiar la tabla antes de actualizarla
-
-        for (Partition partition : partitions) {
-            String processName = partition.isAvailable() ? "Libre" : partition.getProcess();
-            Object[] row = {partition.getLocation(), partition.getSize(), partition.isAvailable() ? "Libre" : "Ocupado", processName};
-            model.addRow(row);
-        }
-    }
-
-    // Método para actualizar la tabla de procesos en MVTFrame
-    public void updateProcessTable(List<Process> processList) {
-        DefaultTableModel model = (DefaultTableModel) tbProcesos.getModel();
-        model.setRowCount(0); // Limpiar la tabla antes de actualizarla
-
-        for (Process process : processList) {
-            Object[] row = {process.getName(), process.getSize(), process.getArrivalTime(), process.getDuration()};
-            model.addRow(row);
-        }
-    }
-
-    public void runNextStep() {
-        // Verificar si hay procesos en la lista de espera
-        if (!memory.getProcessList().isEmpty()) {
-            // Ejecutar un paso en la simulación para el siguiente proceso en la lista
-            memory.runStep();
-            // Actualizar las tablas en la interfaz gráfica
-            updateProcessTable(memory.getProcessList());
-            updateFreeAreasTable(memory.getPartitions());
-            updatePartitionsTable(memory.getPartitions());
-        } else {
-            // Si no hay procesos en espera, mostrar mensaje
-            JOptionPane.showMessageDialog(this, "No hay más procesos para ejecutar.");
-        }
-    }
 }
